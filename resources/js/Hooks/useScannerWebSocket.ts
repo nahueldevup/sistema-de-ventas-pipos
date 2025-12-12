@@ -1,12 +1,12 @@
-import { useEffect, useRef, useCallback, useState } from 'react';
+import { useEffect, useRef, useCallback, useState } from "react";
 
 /**
  * Hook para conectarse al WebSocket del scanner-app local.
- * 
+ *
  * El scanner-app corre en la PC del usuario y recibe códigos del móvil.
  * Este hook conecta el browser al scanner-app para recibir los códigos
  * directamente sin simular teclado.
- * 
+ *
  * @param onScan - Callback cuando se recibe un código de barras
  * @param options - Opciones de configuración
  */
@@ -31,15 +31,17 @@ export function useScannerWebSocket(
     options: UseScannerWebSocketOptions = {}
 ) {
     const {
-        url = 'ws://localhost:8001/ws/scanner',
+        url = "ws://localhost:8001/ws/scanner",
         enabled = true,
         reconnectInterval = 3000,
     } = options;
 
     const wsRef = useRef<WebSocket | null>(null);
-    const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+        null
+    );
     const onScanRef = useRef(onScan);
-    
+
     const [connectionState, setConnectionState] = useState<ConnectionState>({
         isConnected: false,
         isConnecting: false,
@@ -56,15 +58,19 @@ export function useScannerWebSocket(
         if (wsRef.current?.readyState === WebSocket.OPEN) return;
         if (wsRef.current?.readyState === WebSocket.CONNECTING) return;
 
-        setConnectionState(prev => ({ ...prev, isConnecting: true, error: null }));
-        console.log('Conectando al scanner-app...');
+        setConnectionState((prev) => ({
+            ...prev,
+            isConnecting: true,
+            error: null,
+        }));
+        console.log("Conectando al scanner-app...");
 
         try {
             const ws = new WebSocket(url);
             wsRef.current = ws;
 
             ws.onopen = () => {
-                console.log('Conectado al scanner-app');
+                console.log("Conectado al scanner-app");
                 setConnectionState({
                     isConnected: true,
                     isConnecting: false,
@@ -75,8 +81,8 @@ export function useScannerWebSocket(
             ws.onmessage = (event) => {
                 try {
                     const data = JSON.parse(event.data);
-                    if (data.type === 'scan' && data.barcode) {
-                        console.log('Código recibido:', data.barcode);
+                    if (data.type === "scan" && data.barcode) {
+                        console.log("Código recibido:", data.barcode);
                         onScanRef.current(data.barcode);
                     }
                 } catch (e) {
@@ -85,7 +91,7 @@ export function useScannerWebSocket(
             };
 
             ws.onclose = () => {
-                console.log('Desconectado del scanner-app');
+                console.log("Desconectado del scanner-app");
                 setConnectionState({
                     isConnected: false,
                     isConnecting: false,
@@ -102,30 +108,31 @@ export function useScannerWebSocket(
             };
 
             ws.onerror = (error) => {
-                console.log('Error de conexión con scanner-app (¿está corriendo?)');
+                console.log(
+                    "Error de conexión con scanner-app (¿está corriendo?)"
+                );
                 setConnectionState({
                     isConnected: false,
                     isConnecting: false,
-                    error: 'No se pudo conectar al scanner-app',
+                    error: "No se pudo conectar al scanner-app",
                 });
             };
 
             // Ping para mantener conexión viva
             const pingInterval = setInterval(() => {
                 if (ws.readyState === WebSocket.OPEN) {
-                    ws.send('ping');
+                    ws.send("ping");
                 }
             }, 30000);
 
-            ws.addEventListener('close', () => {
+            ws.addEventListener("close", () => {
                 clearInterval(pingInterval);
             });
-
         } catch (error) {
             setConnectionState({
                 isConnected: false,
                 isConnecting: false,
-                error: 'Error al crear conexión WebSocket',
+                error: "Error al crear conexión WebSocket",
             });
         }
     }, [url, enabled, reconnectInterval]);
@@ -136,6 +143,8 @@ export function useScannerWebSocket(
             reconnectTimeoutRef.current = null;
         }
         if (wsRef.current) {
+            // CRÍTICO: Anular onclose para EVITAR reconexión "zombie" al desmontar
+            wsRef.current.onclose = null;
             wsRef.current.close();
             wsRef.current = null;
         }
